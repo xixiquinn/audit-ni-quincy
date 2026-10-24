@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Finance Auditor</title>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0f1714;--card:#17221e;--line:#24332d;--text:#e8efe9;--mute:#8ea69a;--acc:#4ade80;--warn:#fbbf24;--bad:#f87171}
+*{box-sizing:border-box}body{margin:0;font-family:Manrope,sans-serif;background:var(--bg);color:var(--text)}
+.wrap{max-width:1100px;margin:auto;padding:40px 20px}a{color:var(--acc)}
+h1{font-size:40px;margin:0 0 6px;letter-spacing:-1px}.mute{color:var(--mute)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:24px;margin-top:20px}
+.btn{display:inline-block;background:var(--acc);color:#06210f;border:0;padding:12px 22px;border-radius:10px;font-weight:800;cursor:pointer;text-decoration:none;font-size:15px}
+.btn.ghost{background:transparent;color:var(--text);border:1px solid var(--line)}
+.drop{border:2px dashed var(--line);border-radius:14px;padding:50px;text-align:center;cursor:pointer;transition:.2s}
+.drop:hover,.drop.on{border-color:var(--acc);background:#1b2a24}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px}.stat b{font-size:24px;display:block;margin-top:4px}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{color:var(--mute);font-weight:600}.scroll{overflow:auto;max-height:520px}
+.tag{background:#3a2c0b;color:var(--warn);padding:3px 8px;border-radius:99px;font-size:12px;margin:2px;display:inline-block}
+.flash{background:#3a1515;color:var(--bad);padding:12px;border-radius:10px;margin-top:16px}
+.bar{height:8px;background:var(--acc);border-radius:4px}
+</style></head><body><div class="wrap">
+{% with m = get_flashed_messages() %}{% for x in m %}<div class="flash">{{x}}</div>{% endfor %}{% endwith %}
+{% block body %}{% endblock %}</div></body></html>

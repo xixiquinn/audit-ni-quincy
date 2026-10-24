@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% block body %}
+<div style="max-width:380px;margin:12vh auto 0">
+<h1>Finance Auditor</h1><p class="mute">Private — owner sign in</p>
+<form class="card" method="post" style="display:grid;gap:12px">
+<input name="username" placeholder="Username" autocomplete="username" required class="inp">
+<input name="password" type="password" placeholder="Password" autocomplete="current-password" required class="inp">
+<button class="btn">Sign in</button></form></div>
+<style>.inp{background:#0f1714;border:1px solid var(--line);color:var(--text);padding:12px;border-radius:10px;font:inherit}.inp:focus{outline:none;border-color:var(--acc)}</style>
+{% endblock %}

@@ -1,0 +1,109 @@
+{% extends "base.html" %}{% block body %}
+<style>
+.tbl input,.tbl select{width:100%;background:transparent;border:1px solid transparent;color:var(--text);padding:7px;border-radius:7px;font:inherit}
+.tbl input:focus,.tbl select:focus{outline:none;border-color:var(--acc);background:#0f1714}
+.tbl select option{background:var(--card)}.tbl td{padding:3px}.num{text-align:right;font-variant-numeric:tabular-nums}
+.fsel{background:var(--card);color:var(--text);border:1px solid var(--line);padding:9px 12px;border-radius:10px;font:inherit;font-weight:600}.btn.sm{padding:8px 12px;font-size:13px}
+.x{background:none;border:0;color:var(--mute);cursor:pointer;font-size:16px}.x:hover{color:var(--bad)}
+.pos{color:var(--acc)}.neg{color:var(--bad)}tr.flag td{background:#2a230f}
+.bars div{display:flex;align-items:center;gap:10px;margin:6px 0}.bars span{width:120px;color:var(--mute);font-size:13px}
+</style>
+<div style="display:flex;justify-content:space-between;align-items:end;flex-wrap:wrap;gap:12px">
+<div><h1>Live Ledger</h1>
+<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:6px">
+<select id="fundSel" class="fsel" onchange="openFund(this.value)"></select>
+<button class="btn ghost sm" onclick="newFund()">+ New fund</button>
+<button class="btn ghost sm" onclick="renameFund()">Rename</button>
+<button class="btn ghost sm" onclick="deleteFund()">Delete</button>
+<span id="saveSt" class="mute" style="font-size:13px"></span></div></div>
+<div style="display:flex;gap:8px;flex-wrap:wrap">
+<label class="btn ghost">Import<input type="file" id="imp" accept=".csv,.xlsx,.xls" hidden></label>
+<button class="btn ghost" onclick="exportX()">Export to Excel</button>
+<a class="btn ghost" href="/upload">Audit a file</a>
+<a class="btn ghost" href="/logout">Sign out</a></div></div>
+<div class="grid" style="margin-top:20px">
+<div class="stat"><span class="mute">Income</span><b id="s-inc" class="pos">0</b></div>
+<div class="stat"><span class="mute">Expenses</span><b id="s-exp" class="neg">0</b></div>
+<div class="stat"><span class="mute">Net balance</span><b id="s-net">0</b></div>
+<div class="stat"><span class="mute">Tax total</span><b id="s-tax">0</b></div>
+<div class="stat"><span class="mute">Profit margin</span><b id="s-mar">0%</b></div>
+<div class="stat"><span class="mute">Audit flags</span><b id="s-flg">0</b></div></div>
+<div class="card"><div class="scroll"><table class="tbl"><thead><tr>
+<th>Date</th><th>Description</th><th>Category</th><th>Type</th><th class="num">Amount</th><th class="num">Tax %</th><th class="num">Total</th><th>Flags</th><th></th></tr></thead>
+<tbody id="tb"></tbody></table></div>
+<button class="btn" style="margin-top:14px" onclick="add()">+ Add row</button></div>
+<div class="grid" style="grid-template-columns:1fr 1fr">
+<div class="card"><h3 style="margin-top:0">Expenses by category</h3><div id="cats" class="bars"></div></div>
+<div class="card"><h3 style="margin-top:0">Audit findings</h3><div id="finds"></div></div></div>
+<script>
+let rows=[],fund=null,saveT=null;
+const api=async(u,o={})=>{const r=await fetch(u,{headers:{'Content-Type':'application/json'},...o});if(r.status==401)location='/login';return r.json();};
+const st=t=>document.getElementById('saveSt').textContent=t;
+async function loadFunds(sel){const {funds}=await api('/api/funds');
+ if(!funds.length){const {id}=await api('/api/funds',{method:'POST',body:JSON.stringify({name:'Class Fund'})});return loadFunds(id);}
+ const s=document.getElementById('fundSel');s.innerHTML=funds.map(f=>`<option value="${f.id}">${esc(f.name)}</option>`).join('');
+ const id=sel||localStorage.getItem('fund')||funds[0].id;s.value=funds.some(f=>f.id==id)?id:funds[0].id;openFund(s.value);}
+async function openFund(id){fund=id;localStorage.setItem('fund',id);st('Loading…');const d=await api('/api/funds/'+id);rows=d.rows||[];draw();st('Saved ✓');}
+function persist(){st('Saving…');clearTimeout(saveT);saveT=setTimeout(async()=>{const r=await api('/api/funds/'+fund,{method:'PUT',body:JSON.stringify({rows})});st(r.ok?'Saved ✓':'Save failed!');},600);}
+async function newFund(){const n=prompt('Fund name (e.g. Field Trip Fund)');if(!n)return;const {id}=await api('/api/funds',{method:'POST',body:JSON.stringify({name:n})});loadFunds(id);}
+async function renameFund(){const n=prompt('New name');if(!n)return;await api('/api/funds/'+fund,{method:'PATCH',body:JSON.stringify({name:n})});loadFunds(fund);}
+async function deleteFund(){if(!confirm('Delete this fund and all its entries? This cannot be undone.'))return;await api('/api/funds/'+fund,{method:'DELETE'});localStorage.removeItem('fund');loadFunds();}
+const fmt=n=>n.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function add(){rows.push({date:new Date().toISOString().slice(0,10),description:'',category:'',type:'expense',amount:'',tax:0});draw();persist();}
+function del(i){rows.splice(i,1);draw();persist();}
+function draw(){
+ document.getElementById('tb').innerHTML=rows.map((r,i)=>`<tr id="r${i}">
+ <td><input type="date" value="${esc(r.date)}" oninput="set(${i},'date',this.value)"></td>
+ <td><input value="${esc(r.description)}" placeholder="Description" oninput="set(${i},'description',this.value)"></td>
+ <td><input value="${esc(r.category)}" placeholder="Category" list="catlist" oninput="set(${i},'category',this.value)"></td>
+ <td style="min-width:110px"><select onchange="set(${i},'type',this.value)"><option value="income" ${r.type=='income'?'selected':''}>Income</option><option value="expense" ${r.type!='income'?'selected':''}>Expense</option></select></td>
+ <td><input class="num" type="number" step="0.01" value="${esc(r.amount)}" placeholder="0.00" oninput="set(${i},'amount',this.value)"></td>
+ <td><input class="num" type="number" step="0.1" value="${esc(r.tax)}" oninput="set(${i},'tax',this.value)" style="width:70px"></td>
+ <td class="num" id="t${i}"></td><td id="f${i}"></td>
+ <td><button class="x" onclick="del(${i})">✕</button></td></tr>`).join('')+'<datalist id="catlist"></datalist>';
+ calc();}
+function set(i,k,v){rows[i][k]=v;calc();persist();}
+function calc(){
+ let inc=0,exp=0,tax=0,cats={},flags=0,finds={},seen={};
+ const amts=rows.map(r=>+r.amount||0).filter(a=>a>0),mean=amts.reduce((a,b)=>a+b,0)/(amts.length||1),
+ sd=Math.sqrt(amts.reduce((a,b)=>a+(b-mean)**2,0)/(amts.length||1));
+ rows.forEach(r=>{const k=[r.date,r.amount,r.description.trim().toLowerCase(),r.type].join('|');seen[k]=(seen[k]||0)+1;});
+ rows.forEach((r,i)=>{
+  const a=+r.amount||0,t=a*(+r.tax||0)/100,tot=a+t,f=[];
+  if(r.type=='income')inc+=tot;else{exp+=tot;const c=r.category||'Uncategorized';cats[c]=(cats[c]||0)+tot;}
+  tax+=t;
+  if(r.amount===''||!r.date||!r.description)f.push('Missing');
+  if(a<0)f.push('Negative');
+  if(a>=1000&&a%1000==0)f.push('Round');
+  if(r.amount!==''&&seen[[r.date,r.amount,r.description.trim().toLowerCase(),r.type].join('|')]>1)f.push('Duplicate');
+  if(amts.length>=5&&sd&&Math.abs(a-mean)>2.5*sd)f.push('Outlier');
+  if(r.date){const d=new Date(r.date+'T00:00');if([0,6].includes(d.getDay()))f.push('Weekend');if(d>new Date())f.push('Future');}
+  f.forEach(x=>finds[x]=(finds[x]||0)+1);if(f.length)flags++;
+  const tc=document.getElementById('t'+i);if(tc){tc.textContent=fmt(tot);tc.className='num '+(r.type=='income'?'pos':'neg');
+  document.getElementById('f'+i).innerHTML=f.map(x=>`<span class="tag">${x}</span>`).join('');
+  document.getElementById('r'+i).className=f.length?'flag':'';}
+ });
+ const net=inc-exp;
+ document.getElementById('s-inc').textContent=fmt(inc);document.getElementById('s-exp').textContent=fmt(exp);
+ const n=document.getElementById('s-net');n.textContent=fmt(net);n.className=net>=0?'pos':'neg';
+ document.getElementById('s-tax').textContent=fmt(tax);
+ document.getElementById('s-mar').textContent=inc?(net/inc*100).toFixed(1)+'%':'—';
+ document.getElementById('s-flg').textContent=flags;
+ const max=Math.max(...Object.values(cats),1);
+ document.getElementById('cats').innerHTML=Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([c,v])=>
+  `<div><span>${esc(c)}</span><div class="bar" style="width:${v/max*60}%"></div><small class="mute">${fmt(v)}</small></div>`).join('')||'<p class="mute">No expenses yet</p>';
+ document.getElementById('finds').innerHTML=Object.entries(finds).map(([k,v])=>`<span class="tag">${k}: ${v}</span>`).join('')||'<p class="mute">No issues ✅</p>';
+ const dl=document.getElementById('catlist');if(dl)dl.innerHTML=[...new Set(rows.map(r=>r.category).filter(Boolean))].map(c=>`<option value="${esc(c)}">`).join('');
+}
+document.getElementById('imp').onchange=async e=>{
+ const fd=new FormData();fd.append('file',e.target.files[0]);
+ const r=await fetch('/ledger/import',{method:'POST',body:fd}),j=await r.json();
+ if(j.error)return alert(j.error);
+ if(confirm(`Import ${j.rows.length} rows? OK = replace, Cancel = add to existing`))rows=j.rows;else rows=rows.concat(j.rows);
+ draw();persist();e.target.value='';};
+async function exportX(){
+ const r=await fetch('/ledger/export',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({rows})});
+ const b=await r.blob(),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=(document.getElementById('fundSel').selectedOptions[0]?.text||'ledger')+'.xlsx';a.click();}
+loadFunds();
+</script>{% endblock %}
